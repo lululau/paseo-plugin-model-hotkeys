@@ -5,14 +5,14 @@
 
 ## 快捷键
 
-| 按键 | 作用 |
-| --- | --- |
-| `Ctrl+M` | 打开 / 关闭模型选择弹层 |
-| `Ctrl+N` | 高亮下一项 |
-| `Ctrl+P` | 高亮上一项 |
-| `Enter` | 确认高亮项（等价于点击该行，选中后弹层自动关闭） |
+| 按键     | 作用                                                    |
+|----------|---------------------------------------------------------|
+| `Ctrl+M` | 打开 / 关闭模型选择弹层                                 |
+| `Ctrl+N` | 高亮下一项                                              |
+| `Ctrl+P` | 高亮上一项                                              |
+| `Enter`  | 确认高亮项（等价于点击该行，选中后弹层自动关闭）        |
 | `Ctrl+T` | 循环切换 thinking 级别：off → low → … → 末项 → 回到首项 |
-| `Escape` | 关闭弹层（Paseo 原生行为，无需本插件） |
+| `Escape` | 关闭弹层（Paseo 原生行为，无需本插件）                  |
 
 细节：
 
@@ -71,11 +71,11 @@ Paseo 的插件客户端 bundle 由渲染进程用 `globalThis.eval` 在主世�
 1. 在 `window` 上以捕获阶段监听 `keydown`（先于页面其他处理器拿到按键）；
 2. 通过 Paseo e2e 套件依赖的稳定 `data-testid` 定位元素：
 
-   | 元素 | 选择器 |
-   | --- | --- |
-   | 模型触发按钮 | `[data-testid="combined-model-selector"]` |
-   | 弹层视口（判断开关状态） | `[data-testid="agent-controls-model-viewport"]` |
-   | 可导航行 | `[data-testid^="model-row-"]`、`[data-testid^="model-provider-"]`、`[data-testid^="model-profile-row-"]` |
+   | 元素                     | 选择器                                                                                                   |
+   |--------------------------|----------------------------------------------------------------------------------------------------------|
+   | 模型触发按钮             | `[data-testid="combined-model-selector"]`                                                                |
+   | 弹层视口（判断开关状态） | `[data-testid="agent-controls-model-viewport"]`                                                          |
+   | 可导航行                 | `[data-testid^="model-row-"]`、`[data-testid^="model-provider-"]`、`[data-testid^="model-profile-row-"]` |
 
 3. 用合成 `click` 事件激活 RN-web `Pressable`——react-native-web 的
    `onPress` 由原生 `click` 触发且不校验 `isTrusted`，所以一次
