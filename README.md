@@ -11,6 +11,7 @@
 | `Ctrl+N` 或 `↓` | 高亮下一项 |
 | `Ctrl+P` 或 `↑` | 高亮上一项 |
 | `Enter` | 确认高亮项（等价于点击该行，选中后弹层自动关闭） |
+| `Ctrl+T` | 循环切换 thinking 级别：off → low → … → 末项 → 回到首项 |
 | `Escape` | 关闭弹层（Paseo 原生行为，无需本插件） |
 
 细节：
@@ -21,7 +22,13 @@
 - 弹层打开时仍然可以打字过滤模型，过滤 + 方向键可以混用。
 - 行内包含三类可选项：模型（`model-row-*`）、provider（`model-provider-*`）、
   Agent Profile（`model-profile-row-*`），高亮导航覆盖全部三类。
-- 终端获得焦点时 `Ctrl+M` 不拦截（在终端里它是回车 CR）。
+- `Ctrl+T` 对当前模型的 thinking 选项循环切换（无 thinking 选项的模型上
+  无反应并记录一条 console 日志）。实现方式：点开 thinking 菜单后点击
+  下一项，选项通过 aria-label 识别、当前项从触发按钮 aria-label 内嵌的
+  当前值反推（最长匹配，正确处理"高"/"超高"、"High"/"Extra high"这类
+  前缀关系）。若切换时有其它浮层打开（模型选择、mode 菜单等），会先
+  自动关闭再切换。
+- 终端获得焦点时 `Ctrl+M`、`Ctrl+T` 不拦截（避免干扰终端按键）。
 
 ## 安装
 
@@ -91,6 +98,8 @@ Paseo 的插件客户端 bundle 由渲染进程用 `globalThis.eval` 在主世�
 
 ## 版本兼容
 
+- 0.9.0：新增 `Ctrl+T` 循环切换 thinking 级别（含回绕；先关闭其它浮层
+  再切换；选项经 aria-label 最长匹配定位当前项）。
 - 0.8.0：移除焦点重定向与逐键日志。真凶确认为 BetterTouchTool 中
   Paseo 专属的 Ctrl+N/P→方向键绑定（已由用户删除）；重定向不再必要，
   且它导致弹层内过滤输入框不可用。现在打开弹层后焦点照常落在搜索框，
