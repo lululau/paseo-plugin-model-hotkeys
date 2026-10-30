@@ -39,7 +39,7 @@ const EDGE_FRAMES = 4;
 /** 与 Paseo 自身 keyboard/focus-scope.ts 相同的终端判定。 */
 const TERMINAL_SELECTOR = '[data-testid="terminal-surface"], .xterm';
 
-export default function contribute(_client: PluginClientContext): () => void {
+export default function contribute(client: PluginClientContext): () => void {
   const style = injectHighlightStyle();
   const nav = {
     pending: null as Direction | null,
@@ -92,8 +92,11 @@ export default function contribute(_client: PluginClientContext): () => void {
 
   function openModelSheet(): void {
     // 分屏时存在多个 composer，取第一个可见的触发按钮（与 e2e 行为一致）。
-    const trigger = Array.from(document.querySelectorAll<HTMLElement>(TRIGGER_SELECTOR)).find(
-      isVisible,
+    const candidates = Array.from(document.querySelectorAll<HTMLElement>(TRIGGER_SELECTOR));
+    const trigger = candidates.find(isVisible);
+    console.info(
+      `[model-hotkeys] openModelSheet: ${candidates.length} trigger(s) in DOM, ` +
+        `visible: ${trigger ? "yes" : "no"}`,
     );
     if (trigger) syntheticClick(trigger);
   }
@@ -106,17 +109,10 @@ export default function contribute(_client: PluginClientContext): () => void {
     );
   }
 
-  function overlayRootHasChildren(): boolean {
-    const root = document.getElementById("overlay-root");
-    return Boolean(root && root.childElementCount > 0);
-  }
-
   function inTerminalScope(): boolean {
     const active = document.activeElement;
     return Boolean(active && active.closest(TERMINAL_SELECTOR));
-  }
-
-  /** 同步执行一次移动；目标行未渲染时保持 pending 并逐帧重试。 */
+  }  /** 同步执行一次移动；目标行未渲染时保持 pending 并逐帧重试。 */
   function pump(): void {
     if (!nav.pending) {
       nav.pumping = false;
@@ -183,12 +179,15 @@ export default function contribute(_client: PluginClientContext): () => void {
       !event.shiftKey &&
       lower === "m"
     ) {
-      if (inTerminalScope()) return;
+      if (inTerminalScope()) {
+        console.debug("[model-hotkeys] Ctrl+M skipped: terminal focus");
+        return;
+      }
       event.preventDefault();
       event.stopImmediatePropagation();
       if (sheetOpen) {
         closeModelSheet();
-      } else if (!overlayRootHasChildren()) {
+      } else {
         openModelSheet();
       }
       return;
@@ -229,9 +228,22 @@ export default function contribute(_client: PluginClientContext): () => void {
     }
   }
 
+  // 诊断探针：Command Center（Cmd+K）里的手动入口。它的出现证明本插件
+  // 已被应用评估执行；它本身也能走同一条路径打开模型选择弹层。
+  const removeCommandCenterItem = client.addCommandCenterItem({
+    id: "open-model-picker",
+    title: "Model Hotkeys: Open model picker",
+    icon: "ListFilter",
+    context: "global",
+    onSelect: () => openModelSheet(),
+  });
+
+  console.info("[model-hotkeys] client bundle evaluated; keydown listener installed");
+
   window.addEventListener("keydown", onKeyDown, true);
   return () => {
     window.removeEventListener("keydown", onKeyDown, true);
+    removeCommandCenterItem();
     highlight(null);
     style.remove();
   };
