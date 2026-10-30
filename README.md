@@ -72,6 +72,11 @@ Paseo 的插件客户端 bundle 由渲染进程用 `globalThis.eval` 在主世�
 - `data-testid` 不是面向插件的公开 API，但被 Paseo 官方 e2e 测试依赖，
   相对稳定；若未来版本改名，症状是快捷键无反应（不会崩溃），届时更新
   `index.client.ts` 顶部的选择器常量并 `paseo plugin reload` 即可。
+- 模型选择器有两种形态：桌面宽屏是 Combobox 浮层（`CombinedModelSelector`），
+  窄屏是底部弹层（`CompactModelSheet`）。插件以「DOM 中存在模型行」判定
+  弹层打开，两种形态都覆盖。注意 Combobox 形态下应用自身的浮层键盘处理
+  会在监听注册顺序不利时抢占裸方向键（它自己的选项列表是空的，所以原生
+  方向键本来也不起作用）；`Ctrl+N/P` 与 `Enter` 不受此影响，始终可用。
 - 焦点在浏览器面板（内嵌 webview）内时，按键不会到达主窗口，
   `Ctrl+M` 暂不可用；先点一下 Paseo 自身的界面即可。
 - macOS 上 `Cmd+M` 是系统级窗口最小化，与本插件无关；本插件只用 `Ctrl+M`。
@@ -82,4 +87,7 @@ Paseo 的插件客户端 bundle 由渲染进程用 `globalThis.eval` 在主世�
 
 ## 版本兼容
 
+- 0.3.0：弹层打开判定改为「模型行存在」，修复桌面宽屏（Combobox 形态）
+  下 Ctrl+N/P 与 Enter 不生效的问题。
+- 0.2.0：Command Center 诊断入口（Cmd+K 搜 "Model Hotkeys"）、console 日志。
 - 0.1.0：基于 Paseo 0.14.0 源码验证（选择器、RN-web 0.21 事件语义）。
