@@ -87,6 +87,11 @@ Paseo 的插件客户端 bundle 由渲染进程用 `globalThis.eval` 在主世�
 
 ## 版本兼容
 
+- 0.5.0：按键匹配改用物理键码 `event.code`（中文 IME 可能把 `key` 改写为
+  `Process` 或附带 `isComposing`）；带修饰键的组合键穿过 IME 组合保护；
+  Enter 在未移动过高亮时直接确认当前已选模型。
+- 0.4.0：全量按键日志、搜索框兜底判定、DOM 诊断转储（Command Center 里
+  "Model Hotkeys: Dump diagnostics"）、异常捕获。
 - 0.3.0：弹层打开判定改为「模型行存在」，修复桌面宽屏（Combobox 形态）
   下 Ctrl+N/P 与 Enter 不生效的问题。
 - 0.2.0：Command Center 诊断入口（Cmd+K 搜 "Model Hotkeys"）、console 日志。
