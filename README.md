@@ -74,26 +74,32 @@ Paseo 的插件客户端 bundle 由渲染进程用 `globalThis.eval` 在主世�
   `index.client.ts` 顶部的选择器常量并 `paseo plugin reload` 即可。
 - 模型选择器有两种形态：桌面宽屏是 Combobox 浮层（`CombinedModelSelector`），
   窄屏是底部弹层（`CompactModelSheet`）。插件以「DOM 中存在模型行」判定
-  弹层打开，两种形态都覆盖。注意 Combobox 形态下应用自身的浮层键盘处理
-  会在监听注册顺序不利时抢占裸方向键（它自己的选项列表是空的，所以原生
-  方向键本来也不起作用）；`Ctrl+N/P` 与 `Enter` 不受此影响，始终可用。
+  弹层打开，两种形态都覆盖。
+- **裸方向键在此下拉里不生效**：Paseo 的快捷键引擎（应用启动即注册）
+  会把方向键优先交给浮层处理并阻断传播。Ctrl+N/P 与 Enter 不受影响。
+- **外部改键工具的坑**（本项目排查过程中实际踩到）：BetterTouchTool 等
+  工具若为 Paseo 配置了 Ctrl+N/Ctrl+P 的绑定（例如映射为裸方向键），
+  会在应用层消费这些按键，插件完全收不到 keydown。若快捷键全部失灵，
+  先检查 BTT/Karabiner/Hammerspoon 里有没有 Paseo 专属或全局的 N/P 绑定。
 - 焦点在浏览器面板（内嵌 webview）内时，按键不会到达主窗口，
   `Ctrl+M` 暂不可用；先点一下 Paseo 自身的界面即可。
 - macOS 上 `Cmd+M` 是系统级窗口最小化，与本插件无关；本插件只用 `Ctrl+M`。
-- 在 Windows/Linux 上 `Ctrl+N` 与 Paseo 的“新建工作区”冲突（弹层打开时
+- 在 Windows/Linux 上 `Ctrl+N` 与 Paseo 的"新建工作区"冲突（弹层打开时
   本插件优先拦截）；macOS 无此问题。
 - 本机开发类型检查：`npm install && npm run typecheck`。Paseo 安装时用
   自带 esbuild 编译 TS，无需本地构建。
 
 ## 版本兼容
 
-- 0.6.0：弹层打开后把焦点从搜索框重定向到列表行（当前已选模型行并高亮）。
-  实测 macOS 上焦点在文本输入框内时 Ctrl+N/P 的 keydown 会被输入层整体
-  消费、从不派发给页面（Ctrl+M/Enter 不受影响），离开文本上下文即恢复。
-  想打字过滤仍可点击搜索框（重定向只在每次打开后做一次）。
-- 0.5.0：按键匹配改用物理键码 `event.code`（中文 IME 可能把 `key` 改写为
-  `Process` 或附带 `isComposing`）；带修饰键的组合键穿过 IME 组合保护；
-  Enter 在未移动过高亮时直接确认当前已选模型。
+- 0.8.0：移除焦点重定向与逐键日志。真凶确认为 BetterTouchTool 中
+  Paseo 专属的 Ctrl+N/P→方向键绑定（已由用户删除）；重定向不再必要，
+  且它导致弹层内过滤输入框不可用。现在打开弹层后焦点照常落在搜索框，
+  可直接打字过滤，Ctrl+N/P 导航与过滤共存。
+- 0.7.0：焦点重定向改为无条件执行（用户点击搜索框除外）+ 全链路日志。
+  （该机制基于"macOS 文本上下文消费 Ctrl+N/P"的错误诊断，0.8.0 移除。）
+- 0.6.0：首次引入搜索框→列表行的焦点重定向。（同上，已移除。）
+- 0.5.0：按键匹配改用物理键码 `event.code`（IME 可能把 `key` 改写为
+  `Process` 或附带 `isComposing`）；Enter 在未移动过高亮时确认当前已选模型。
 - 0.4.0：全量按键日志、搜索框兜底判定、DOM 诊断转储（Command Center 里
   "Model Hotkeys: Dump diagnostics"）、异常捕获。
 - 0.3.0：弹层打开判定改为「模型行存在」，修复桌面宽屏（Combobox 形态）
