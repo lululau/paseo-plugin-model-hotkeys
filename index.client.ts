@@ -2,8 +2,8 @@
  * Paseo 插件：为对话输入框下方的模型选择器补齐键盘操作。
  *
  *   Ctrl+M          打开 / 关闭模型选择弹层
- *   Ctrl+N 或 ↓     高亮下一项
- *   Ctrl+P 或 ↑     高亮上一项
+ *   Ctrl+N          高亮下一项
+ *   Ctrl+P          高亮上一项
  *   Enter           确认高亮项（等价于点击该行）
  *   Ctrl+T          循环切换 thinking 级别（off→low→…→末项→回到首项）
  *   Escape          关闭弹层（Paseo 原生行为）
@@ -329,10 +329,8 @@ export default function contribute(client: PluginClientContext): () => void {
 
     let dir: Direction | null = null;
     if (!event.metaKey && !event.altKey && !event.shiftKey) {
-      if ((event.ctrlKey && (lower === "n" || code === "KeyN")) || key === "ArrowDown")
-        dir = "down";
-      else if ((event.ctrlKey && (lower === "p" || code === "KeyP")) || key === "ArrowUp")
-        dir = "up";
+      if (event.ctrlKey && (lower === "n" || code === "KeyN")) dir = "down";
+      else if (event.ctrlKey && (lower === "p" || code === "KeyP")) dir = "up";
     }
     if (dir) {
       // 焦点在弹层搜索框里：拦下按键，避免落入输入框，改由导航消费。

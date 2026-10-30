@@ -8,8 +8,8 @@
 | 按键 | 作用 |
 | --- | --- |
 | `Ctrl+M` | 打开 / 关闭模型选择弹层 |
-| `Ctrl+N` 或 `↓` | 高亮下一项 |
-| `Ctrl+P` 或 `↑` | 高亮上一项 |
+| `Ctrl+N` | 高亮下一项 |
+| `Ctrl+P` | 高亮上一项 |
 | `Enter` | 确认高亮项（等价于点击该行，选中后弹层自动关闭） |
 | `Ctrl+T` | 循环切换 thinking 级别：off → low → … → 末项 → 回到首项 |
 | `Escape` | 关闭弹层（Paseo 原生行为，无需本插件） |
@@ -17,9 +17,9 @@
 细节：
 
 - 打开弹层后初始高亮落在**当前已选中的模型**上，`Ctrl+N/P` 从它开始移动。
-- 弹层内的高亮行以蓝色描边展示；列表支持按住方向键连续移动（自动处理
+- 弹层内的高亮行以蓝色描边展示；列表支持按住 `Ctrl+N/P` 连续移动（自动处理
   FlatList 虚拟化：目标行未渲染时先滚动再逐帧重试）。
-- 弹层打开时仍然可以打字过滤模型，过滤 + 方向键可以混用。
+- 弹层打开时仍然可以打字过滤模型，过滤 + `Ctrl+N/P` 可以混用。
 - 行内包含三类可选项：模型（`model-row-*`）、provider（`model-provider-*`）、
   Agent Profile（`model-profile-row-*`），高亮导航覆盖全部三类。
 - `Ctrl+T` 对当前模型的 thinking 选项循环切换（无 thinking 选项的模型上
@@ -35,8 +35,17 @@
 要求：Paseo ≥ 0.14.0，daemon 已开启插件（`pluginsEnabled: true`，
 即 Settings → Plugins 里能看到插件列表即可）。
 
+从 GitHub 安装（推荐）：
+
 ```bash
-paseo plugin install ~/cascode/github.com/paseo-plugin-model-hotkeys
+paseo plugin install git:lululau/paseo-plugin-model-hotkeys
+```
+
+或克隆后从本地目录安装（适合自行修改）：
+
+```bash
+git clone https://github.com/lululau/paseo-plugin-model-hotkeys
+paseo plugin install ./paseo-plugin-model-hotkeys
 ```
 
 安装后重启 Paseo 桌面端（插件客户端代码在应用启动时评估）。用
@@ -82,8 +91,6 @@ Paseo 的插件客户端 bundle 由渲染进程用 `globalThis.eval` 在主世�
 - 模型选择器有两种形态：桌面宽屏是 Combobox 浮层（`CombinedModelSelector`），
   窄屏是底部弹层（`CompactModelSheet`）。插件以「DOM 中存在模型行」判定
   弹层打开，两种形态都覆盖。
-- **裸方向键在此下拉里不生效**：Paseo 的快捷键引擎（应用启动即注册）
-  会把方向键优先交给浮层处理并阻断传播。Ctrl+N/P 与 Enter 不受影响。
 - **外部改键工具的坑**（本项目排查过程中实际踩到）：BetterTouchTool 等
   工具若为 Paseo 配置了 Ctrl+N/Ctrl+P 的绑定（例如映射为裸方向键），
   会在应用层消费这些按键，插件完全收不到 keydown。若快捷键全部失灵，
@@ -98,6 +105,9 @@ Paseo 的插件客户端 bundle 由渲染进程用 `globalThis.eval` 在主世�
 
 ## 版本兼容
 
+- 0.10.0：移除裸方向键支持（在桌面下拉里被应用快捷键引擎拦截，本就
+  不可用），导航统一为 `Ctrl+N/P`；新增 Apache-2.0 许可证与 GitHub
+  安装方式。
 - 0.9.0：新增 `Ctrl+T` 循环切换 thinking 级别（含回绕；先关闭其它浮层
   再切换；选项经 aria-label 最长匹配定位当前项）。
 - 0.8.0：移除焦点重定向与逐键日志。真凶确认为 BetterTouchTool 中
@@ -115,3 +125,7 @@ Paseo 的插件客户端 bundle 由渲染进程用 `globalThis.eval` 在主世�
   下 Ctrl+N/P 与 Enter 不生效的问题。
 - 0.2.0：Command Center 诊断入口（Cmd+K 搜 "Model Hotkeys"）、console 日志。
 - 0.1.0：基于 Paseo 0.14.0 源码验证（选择器、RN-web 0.21 事件语义）。
+
+## 许可证
+
+[Apache-2.0](LICENSE)

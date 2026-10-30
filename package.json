@@ -1,8 +1,9 @@
 {
   "name": "paseo-plugin-model-hotkeys",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
-  "description": "Paseo 模型选择器键盘快捷键插件（Ctrl+M / Ctrl+N/P / Enter）",
+  "description": "Paseo 模型选择器键盘快捷键插件（Ctrl+M / Ctrl+N/P / Enter / Ctrl+T）",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit"
