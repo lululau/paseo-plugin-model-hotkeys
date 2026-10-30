@@ -193,34 +193,43 @@ export default function contribute(client: PluginClientContext): () => void {
   }
 
   function handleKeyDown(event: KeyboardEvent): void {
-    if (event.isComposing) return;
     const key = event.key;
+    const code = event.code;
     const lower = key.length === 1 ? key.toLowerCase() : key;
 
     if (
       (event.ctrlKey && !event.metaKey && "mnp".includes(lower)) ||
+      code === "KeyM" ||
+      code === "KeyN" ||
+      code === "KeyP" ||
       key === "ArrowDown" ||
       key === "ArrowUp" ||
       key === "Enter"
     ) {
       const focus = document.activeElement;
       console.info(
-        `[model-hotkeys] key=${key} ctrl=${event.ctrlKey} open=${modelSheetOpen()} ` +
+        `[model-hotkeys] key=${key} code=${code} ctrl=${event.ctrlKey} ` +
+          `composing=${event.isComposing} open=${modelSheetOpen()} ` +
           `rows=${document.querySelectorAll(ROW_SELECTOR).length} ` +
           `search=${document.querySelectorAll(SEARCH_INPUT_SELECTOR).length} ` +
           `focus=${focus?.getAttribute?.("data-testid") ?? focus?.tagName ?? "none"}`,
       );
     }
 
+    // 中文 IME 组合期间普通按键交给输入法；带修饰键的组合键不参与组字，
+    // 且 macOS 文本系统可能以 key="Process" 或 isComposing 送达，照常处理。
+    if (event.isComposing && !event.ctrlKey && !event.metaKey && !event.altKey) return;
+
     const sheetOpen = modelSheetOpen();
 
     // Ctrl+M：切换模型弹层。终端里 Ctrl+M 是回车（CR），原样放行。
+    // 匹配同时看 key 与物理键码 code（IME 可能改写 key 甚至置为 Process）。
     if (
       event.ctrlKey &&
       !event.metaKey &&
       !event.altKey &&
       !event.shiftKey &&
-      lower === "m"
+      (lower === "m" || code === "KeyM")
     ) {
       if (inTerminalScope()) {
         console.debug("[model-hotkeys] Ctrl+M skipped: terminal focus");
@@ -246,8 +255,10 @@ export default function contribute(client: PluginClientContext): () => void {
 
     let dir: Direction | null = null;
     if (!event.metaKey && !event.altKey && !event.shiftKey) {
-      if ((event.ctrlKey && lower === "n") || key === "ArrowDown") dir = "down";
-      else if ((event.ctrlKey && lower === "p") || key === "ArrowUp") dir = "up";
+      if ((event.ctrlKey && (lower === "n" || code === "KeyN")) || key === "ArrowDown")
+        dir = "down";
+      else if ((event.ctrlKey && (lower === "p" || code === "KeyP")) || key === "ArrowUp")
+        dir = "up";
     }
     if (dir) {
       // 焦点在弹层搜索框里：拦下按键，避免落入输入框，改由导航消费。
@@ -259,10 +270,11 @@ export default function contribute(client: PluginClientContext): () => void {
 
     if (key === "Enter" && !event.ctrlKey && !event.metaKey && !event.altKey) {
       const rows = sheetRows();
+      // 没移动过高亮时，Enter 落在当前已选中的模型行上（等于确认现状）。
       const row =
-        nav.active && rows.includes(nav.active)
-          ? nav.active
-          : ((document.activeElement?.closest(ROW_SELECTOR) as HTMLElement | null) ?? null);
+        (nav.active && rows.includes(nav.active) ? nav.active : null) ??
+        selectedRow(rows) ??
+        ((document.activeElement?.closest(ROW_SELECTOR) as HTMLElement | null) ?? null);
       if (row && rows.includes(row)) {
         event.preventDefault();
         nav.pending = null;
