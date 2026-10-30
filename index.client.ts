@@ -5,6 +5,7 @@
  *   Ctrl+N 或 ↓     高亮下一项
  *   Ctrl+P 或 ↑     高亮上一项
  *   Enter           确认高亮项（等价于点击该行）
+ *   Ctrl+T          循环切换 thinking 级别（off→low→…→末项→回到首项）
  *   Escape          关闭弹层（Paseo 原生行为）
  *
  * 原理：插件客户端代码由 Paseo 在渲染进程主世界用 `globalThis.eval` 执行
@@ -32,6 +33,13 @@ const ROW_SELECTOR = [
 /** 弹层搜索框（model-search-all-input / model-search-input）同样只在弹层
  *  打开时渲染；作为「弹层打开」的兜底信号。 */
 const SEARCH_INPUT_SELECTOR = '[data-testid^="model-search"]';
+
+/** thinking 级别触发按钮（桌面工具栏 / 紧凑设置列表两种形态）。 */
+const THINKING_TRIGGER_SELECTOR =
+  '[data-testid="agent-thinking-selector"], [data-testid="agent-controls-thinking"]';
+/** Combobox 浮层容器；thinking、mode、模型选择共用这一个容器 testID，
+ *  因此判断「菜单里是什么」要靠内容而不是容器本身。 */
+const COMBOBOX_CONTAINER_SELECTOR = '[data-testid="combobox-desktop-container"]';
 
 /** 高亮行打上的标记属性。用「属性选择器 + 注入样式」画高亮，React 重渲染不会冲掉。 */
 const ACTIVE_ATTR = "data-model-nav-active";
@@ -120,6 +128,76 @@ export default function contribute(client: PluginClientContext): () => void {
   function inTerminalScope(): boolean {
     const active = document.activeElement;
     return Boolean(active && active.closest(TERMINAL_SELECTOR));
+  }
+
+  /**
+   * Ctrl+T：循环切换 thinking 级别。thinking 选项没有专属 testID，但每个
+   * 选项是 role="button" 且 aria-label 为自身标签；触发按钮的 aria-label
+   * 内嵌当前值（如「选择 thinking 选项（高）」），据此定位当前项。
+   */
+  function cycleThinkingLevel(): void {
+    const trigger = Array.from(
+      document.querySelectorAll<HTMLElement>(THINKING_TRIGGER_SELECTOR),
+    ).find(isVisible);
+    if (!trigger) {
+      console.info("[model-hotkeys] cycleThinking: 当前模型没有 thinking 选项");
+      return;
+    }
+    const triggerLabel = trigger.getAttribute("aria-label") ?? "";
+    // 先关掉已打开的浮层：Combobox 容器 testID 是共用的，不关就无法区分
+    // 眼前这个菜单到底是 thinking、mode 还是模型选择。
+    closeComboboxOverlays(() => {
+      syntheticClick(trigger);
+      waitForElement(COMBOBOX_CONTAINER_SELECTOR, 20, () => {
+        const menu = document.querySelector<HTMLElement>(COMBOBOX_CONTAINER_SELECTOR);
+        const options = menu
+          ? Array.from(menu.querySelectorAll<HTMLElement>('[role="button"][aria-label]'))
+          : [];
+        if (options.length === 0) {
+          console.info("[model-hotkeys] cycleThinking: 菜单里没有选项，关闭菜单");
+          closeComboboxOverlays(() => undefined);
+          return;
+        }
+        const next = (currentOptionIndex(options, triggerLabel) + 1) % options.length;
+        console.info(
+          `[model-hotkeys] cycleThinking -> ${options[next].getAttribute("aria-label")}`,
+        );
+        syntheticClick(options[next]);
+      });
+    });
+  }
+
+  /** 当前项 = aria-label 被触发按钮 aria-label 包含的最长选项
+   *  （"高"与"超高"、"High"与"Extra high"这类前缀关系取长者）。 */
+  function currentOptionIndex(options: HTMLElement[], triggerLabel: string): number {
+    let current = -1;
+    let longest = 0;
+    for (const [index, option] of options.entries()) {
+      const label = option.getAttribute("aria-label") ?? "";
+      if (label.length > longest && triggerLabel.includes(label)) {
+        longest = label.length;
+        current = index;
+      }
+    }
+    return current;
+  }
+
+  /** 合成 Escape 交给应用的浮层路由逐层关闭 Combobox 浮层，最多等三轮。 */
+  function closeComboboxOverlays(then: () => void, rounds = 3): void {
+    if (!document.querySelector(COMBOBOX_CONTAINER_SELECTOR) || rounds <= 0) {
+      then();
+      return;
+    }
+    closeModelSheet();
+    requestAnimationFrame(() => closeComboboxOverlays(then, rounds - 1));
+  }
+
+  function waitForElement(selector: string, frames: number, then: () => void): void {
+    if (document.querySelector(selector) || frames <= 0) {
+      then();
+      return;
+    }
+    requestAnimationFrame(() => waitForElement(selector, frames - 1, then));
   }  /** 同步执行一次移动；目标行未渲染时保持 pending 并逐帧重试。 */
   function pump(): void {
     try {
@@ -223,6 +301,21 @@ export default function contribute(client: PluginClientContext): () => void {
       } else {
         openModelSheet();
       }
+      return;
+    }
+
+    // Ctrl+T：循环切换 thinking 级别（与弹层开关状态无关，随时可用）。
+    if (
+      event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.shiftKey &&
+      (lower === "t" || code === "KeyT")
+    ) {
+      if (inTerminalScope()) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cycleThinkingLevel();
       return;
     }
 
