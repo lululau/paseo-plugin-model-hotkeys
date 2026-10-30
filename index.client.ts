@@ -52,8 +52,6 @@ export default function contribute(client: PluginClientContext): () => void {
     active: null as HTMLElement | null,
     pumping: false,
     edgeFrames: 0,
-    userWantsSearch: false,
-    redirectTries: 0,
   };
 
   function sheetRows(): HTMLElement[] {
@@ -122,59 +120,6 @@ export default function contribute(client: PluginClientContext): () => void {
   function inTerminalScope(): boolean {
     const active = document.activeElement;
     return Boolean(active && active.closest(TERMINAL_SELECTOR));
-  }
-
-  /**
-   * 实测（macOS + 中文输入法）：焦点位于文本输入框内时，Ctrl+N/P 的
-   * keydown 会被 macOS 输入层整体消费、从不派发给页面（Ctrl+M、Enter
-   * 则正常到达；焦点在非文本元素上时 Ctrl+N/P 正常到达——均已实测）。
-   * 弹层打开时应用会把焦点自动放进搜索框，因此在搜索框获得焦点时把
-   * 焦点重定向到列表行（非文本元素），导航键才能离开文本上下文。
-   * 焦点仍在弹层作用域内，不会触发应用浮层的焦点强制回收。
-   * 唯一豁免：用户主动点击搜索框（pointerdown）想打字过滤时不再抢焦点。
-   */
-  function redirectFocusToRow(): void {
-    const rows = sheetRows();
-    if (rows.length === 0) {
-      // FlatList 的行是异步挂载的，逐帧重试一段时间。
-      if (nav.redirectTries++ < 40) {
-        requestAnimationFrame(redirectFocusToRow);
-        return;
-      }
-      console.warn("[model-hotkeys] focus redirect gave up: no rows rendered");
-      nav.redirectTries = 0;
-      return;
-    }
-    nav.redirectTries = 0;
-    const row = selectedRow(rows) ?? rows[0];
-    highlight(row);
-    row.focus({ preventScroll: false });
-    console.info("[model-hotkeys] focus redirected to row:", row.getAttribute("data-testid"));
-  }
-
-  function handleFocusIn(event: FocusEvent): void {
-    const target = event.target;
-    if (target instanceof HTMLElement && target.closest(SEARCH_INPUT_SELECTOR)) {
-      if (nav.userWantsSearch) {
-        console.debug("[model-hotkeys] search focus respected (user intent)");
-        return;
-      }
-      console.debug("[model-hotkeys] search autofocused; redirecting focus to row");
-      nav.redirectTries = 0;
-      redirectFocusToRow();
-      return;
-    }
-    if (!modelSheetOpen()) {
-      nav.userWantsSearch = false;
-    }
-  }
-
-  function handlePointerDown(event: PointerEvent): void {
-    const target = event.target;
-    if (target instanceof HTMLElement && target.closest(SEARCH_INPUT_SELECTOR)) {
-      nav.userWantsSearch = true;
-      console.debug("[model-hotkeys] user pressed search input; will keep focus there");
-    }
   }  /** 同步执行一次移动；目标行未渲染时保持 pending 并逐帧重试。 */
   function pump(): void {
     try {
@@ -251,25 +196,6 @@ export default function contribute(client: PluginClientContext): () => void {
     const key = event.key;
     const code = event.code;
     const lower = key.length === 1 ? key.toLowerCase() : key;
-
-    if (
-      (event.ctrlKey && !event.metaKey && "mnp".includes(lower)) ||
-      code === "KeyM" ||
-      code === "KeyN" ||
-      code === "KeyP" ||
-      key === "ArrowDown" ||
-      key === "ArrowUp" ||
-      key === "Enter"
-    ) {
-      const focus = document.activeElement;
-      console.info(
-        `[model-hotkeys] key=${key} code=${code} ctrl=${event.ctrlKey} ` +
-          `composing=${event.isComposing} open=${modelSheetOpen()} ` +
-          `rows=${document.querySelectorAll(ROW_SELECTOR).length} ` +
-          `search=${document.querySelectorAll(SEARCH_INPUT_SELECTOR).length} ` +
-          `focus=${focus?.getAttribute?.("data-testid") ?? focus?.tagName ?? "none"}`,
-      );
-    }
 
     // 中文 IME 组合期间普通按键交给输入法；带修饰键的组合键不参与组字，
     // 且 macOS 文本系统可能以 key="Process" 或 isComposing 送达，照常处理。
@@ -378,12 +304,8 @@ export default function contribute(client: PluginClientContext): () => void {
   console.info("[model-hotkeys] client bundle evaluated; keydown listener installed");
 
   window.addEventListener("keydown", onKeyDown, true);
-  document.addEventListener("focusin", handleFocusIn, true);
-  document.addEventListener("pointerdown", handlePointerDown, true);
   return () => {
     window.removeEventListener("keydown", onKeyDown, true);
-    document.removeEventListener("focusin", handleFocusIn, true);
-    document.removeEventListener("pointerdown", handlePointerDown, true);
     sentinel.active = false;
     delete (window as { __modelHotkeysActive?: boolean }).__modelHotkeysActive;
     removeCommandCenterItem();
