@@ -29,6 +29,10 @@ const ROW_SELECTOR = [
   '[data-testid^="model-profile-row-"]',
 ].join(",");
 
+/** 弹层搜索框（model-search-all-input / model-search-input）同样只在弹层
+ *  打开时渲染；作为「弹层打开」的兜底信号。 */
+const SEARCH_INPUT_SELECTOR = '[data-testid^="model-search"]';
+
 /** 高亮行打上的标记属性。用「属性选择器 + 注入样式」画高亮，React 重渲染不会冲掉。 */
 const ACTIVE_ATTR = "data-model-nav-active";
 
@@ -55,7 +59,10 @@ export default function contribute(client: PluginClientContext): () => void {
   }
 
   function modelSheetOpen(): boolean {
-    return document.querySelector(ROW_SELECTOR) !== null;
+    return (
+      document.querySelector(ROW_SELECTOR) !== null ||
+      document.querySelector(SEARCH_INPUT_SELECTOR) !== null
+    );
   }
 
   /** 弹层打开时初始高亮：优先落在当前已选中的模型行上。 */
@@ -115,6 +122,17 @@ export default function contribute(client: PluginClientContext): () => void {
     return Boolean(active && active.closest(TERMINAL_SELECTOR));
   }  /** 同步执行一次移动；目标行未渲染时保持 pending 并逐帧重试。 */
   function pump(): void {
+    try {
+      pumpStep();
+    } catch (error) {
+      console.error("[model-hotkeys] pump error:", error);
+      nav.pending = null;
+      nav.pumping = false;
+      nav.edgeFrames = 0;
+    }
+  }
+
+  function pumpStep(): void {
     if (!nav.pending) {
       nav.pumping = false;
       return;
@@ -167,9 +185,33 @@ export default function contribute(client: PluginClientContext): () => void {
   }
 
   function onKeyDown(event: KeyboardEvent): void {
+    try {
+      handleKeyDown(event);
+    } catch (error) {
+      console.error("[model-hotkeys] handler error:", error);
+    }
+  }
+
+  function handleKeyDown(event: KeyboardEvent): void {
     if (event.isComposing) return;
     const key = event.key;
     const lower = key.length === 1 ? key.toLowerCase() : key;
+
+    if (
+      (event.ctrlKey && !event.metaKey && "mnp".includes(lower)) ||
+      key === "ArrowDown" ||
+      key === "ArrowUp" ||
+      key === "Enter"
+    ) {
+      const focus = document.activeElement;
+      console.info(
+        `[model-hotkeys] key=${key} ctrl=${event.ctrlKey} open=${modelSheetOpen()} ` +
+          `rows=${document.querySelectorAll(ROW_SELECTOR).length} ` +
+          `search=${document.querySelectorAll(SEARCH_INPUT_SELECTOR).length} ` +
+          `focus=${focus?.getAttribute?.("data-testid") ?? focus?.tagName ?? "none"}`,
+      );
+    }
+
     const sheetOpen = modelSheetOpen();
 
     // Ctrl+M：切换模型弹层。终端里 Ctrl+M 是回车（CR），原样放行。
@@ -239,12 +281,42 @@ export default function contribute(client: PluginClientContext): () => void {
     onSelect: () => openModelSheet(),
   });
 
+  const removeDumpItem = client.addCommandCenterItem({
+    id: "dump-diagnostics",
+    title: "Model Hotkeys: Dump diagnostics",
+    icon: "Bug",
+    context: "global",
+    onSelect: () => {
+      const testIds = Array.from(document.querySelectorAll("[data-testid]"))
+        .map((el) => el.getAttribute("data-testid"))
+        .filter((id): id is string => Boolean(id));
+      const focus = document.activeElement;
+      console.info("[model-hotkeys] diagnostics", {
+        listenerAlive: sentinel.active,
+        open: modelSheetOpen(),
+        rows: document.querySelectorAll(ROW_SELECTOR).length,
+        searchInputs: document.querySelectorAll(SEARCH_INPUT_SELECTOR).length,
+        focusTestId: focus?.getAttribute?.("data-testid") ?? null,
+        totalTestIds: testIds.length,
+        modelishTestIds: testIds.filter((id) =>
+          /model|profile|provider|search|selector|sheet/i.test(id),
+        ),
+      });
+    },
+  });
+
+  const sentinel = { active: true };
+  (window as { __modelHotkeysActive?: boolean }).__modelHotkeysActive = true;
+
   console.info("[model-hotkeys] client bundle evaluated; keydown listener installed");
 
   window.addEventListener("keydown", onKeyDown, true);
   return () => {
     window.removeEventListener("keydown", onKeyDown, true);
+    sentinel.active = false;
+    delete (window as { __modelHotkeysActive?: boolean }).__modelHotkeysActive;
     removeCommandCenterItem();
+    removeDumpItem();
     highlight(null);
     style.remove();
   };
