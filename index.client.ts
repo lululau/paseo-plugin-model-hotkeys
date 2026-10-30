@@ -52,6 +52,8 @@ export default function contribute(client: PluginClientContext): () => void {
     active: null as HTMLElement | null,
     pumping: false,
     edgeFrames: 0,
+    redirectDone: false,
+    redirectTries: 0,
   };
 
   function sheetRows(): HTMLElement[] {
@@ -120,6 +122,37 @@ export default function contribute(client: PluginClientContext): () => void {
   function inTerminalScope(): boolean {
     const active = document.activeElement;
     return Boolean(active && active.closest(TERMINAL_SELECTOR));
+  }
+
+  /**
+   * 实测（macOS + 中文输入法）：焦点位于文本输入框内时，Ctrl+N/P 的
+   * keydown 会被 macOS 输入层整体消费、从不派发给页面（Ctrl+M、Enter
+   * 则正常到达）。弹层打开时应用会把焦点自动放进搜索框，因此这里在
+   * 每次打开后把焦点重定向到列表行（非文本元素），让导航键离开文本
+   * 上下文。焦点仍在弹层作用域内，不会触发应用浮层的焦点强制回收。
+   */
+  function redirectFocusToRow(): void {
+    if (nav.redirectDone) return;
+    const rows = sheetRows();
+    if (rows.length === 0) {
+      // FlatList 的行是异步挂载的，逐帧重试一小段时间。
+      if (nav.redirectTries++ < 12) requestAnimationFrame(redirectFocusToRow);
+      return;
+    }
+    nav.redirectDone = true;
+    nav.redirectTries = 0;
+    const row = selectedRow(rows) ?? rows[0];
+    highlight(row);
+    row.focus({ preventScroll: false });
+  }
+
+  function handleFocusIn(event: FocusEvent): void {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest(SEARCH_INPUT_SELECTOR)) {
+      redirectFocusToRow();
+      return;
+    }
+    if (!modelSheetOpen()) nav.redirectDone = false;
   }  /** 同步执行一次移动；目标行未渲染时保持 pending 并逐帧重试。 */
   function pump(): void {
     try {
@@ -323,8 +356,10 @@ export default function contribute(client: PluginClientContext): () => void {
   console.info("[model-hotkeys] client bundle evaluated; keydown listener installed");
 
   window.addEventListener("keydown", onKeyDown, true);
+  document.addEventListener("focusin", handleFocusIn, true);
   return () => {
     window.removeEventListener("keydown", onKeyDown, true);
+    document.removeEventListener("focusin", handleFocusIn, true);
     sentinel.active = false;
     delete (window as { __modelHotkeysActive?: boolean }).__modelHotkeysActive;
     removeCommandCenterItem();
