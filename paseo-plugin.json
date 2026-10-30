@@ -1,0 +1,6 @@
+{
+  "id": "model-hotkeys",
+  "name": "Model Hotkeys",
+  "description": "模型选择器快捷键：Ctrl+M 打开/关闭，Ctrl+N/P 或方向键移动，Enter 确认",
+  "requirements": { "paseo": ">=0.14.0" }
+}
