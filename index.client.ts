@@ -18,9 +18,11 @@ import type { PluginClientContext } from "@getpaseo/plugin/client";
 
 type Direction = "down" | "up";
 
-/** 触发按钮、弹层视口、可导航的行；均为 Paseo e2e 套件依赖的稳定 testID。 */
+/** 触发按钮与可导航的行；均为 Paseo e2e 套件依赖的稳定 testID。
+ * 模型选择器有两种形态：桌面宽屏是 CombinedModelSelector（Combobox 浮层，
+ * 无独立视口容器），窄屏/移动是 CompactModelSheet（AdaptiveModalSheet）。
+ * 两种形态的行都只在弹层打开时渲染，因此「行存在」即「弹层打开」。 */
 const TRIGGER_SELECTOR = '[data-testid="combined-model-selector"]';
-const VIEWPORT_SELECTOR = '[data-testid="agent-controls-model-viewport"]';
 const ROW_SELECTOR = [
   '[data-testid^="model-row-"]',
   '[data-testid^="model-provider-"]',
@@ -48,13 +50,12 @@ export default function contribute(client: PluginClientContext): () => void {
     edgeFrames: 0,
   };
 
-  function modelSheet(): HTMLElement | null {
-    return document.querySelector<HTMLElement>(VIEWPORT_SELECTOR);
+  function sheetRows(): HTMLElement[] {
+    return Array.from(document.querySelectorAll<HTMLElement>(ROW_SELECTOR));
   }
 
-  function sheetRows(): HTMLElement[] {
-    const sheet = modelSheet();
-    return sheet ? Array.from(sheet.querySelectorAll<HTMLElement>(ROW_SELECTOR)) : [];
+  function modelSheetOpen(): boolean {
+    return document.querySelector(ROW_SELECTOR) !== null;
   }
 
   /** 弹层打开时初始高亮：优先落在当前已选中的模型行上。 */
@@ -169,7 +170,7 @@ export default function contribute(client: PluginClientContext): () => void {
     if (event.isComposing) return;
     const key = event.key;
     const lower = key.length === 1 ? key.toLowerCase() : key;
-    const sheetOpen = Boolean(modelSheet());
+    const sheetOpen = modelSheetOpen();
 
     // Ctrl+M：切换模型弹层。终端里 Ctrl+M 是回车（CR），原样放行。
     if (
